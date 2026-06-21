@@ -43,7 +43,7 @@ function GuestForm({ initial = {}, onSave, onClose }) {
       </div>
       <div className="flex gap-3 pt-2">
         <Btn variant="secondary" className="flex-1" onClick={onClose}>Cancel</Btn>
-        <Btn className="flex-1" disabled={!valid} onClick={() => { onSave(form); onClose(); }}>
+        <Btn className="flex-1" disabled={!valid} onClick={async () => { await onSave(form); onClose(); }}>
           {initial.id ? 'Save Changes' : 'Add Guest'}
         </Btn>
       </div>
@@ -183,12 +183,12 @@ export default function Guests({ guests, bookings, rooms, onAdd, onUpdate, onDel
 
       {showAdd && (
         <Modal title="Add New Guest" onClose={() => setShowAdd(false)} size="lg">
-          <GuestForm onSave={data => { onAdd(data); toast('Guest profile created'); }} onClose={() => setShowAdd(false)} />
+          <GuestForm onSave={async data => { await onAdd(data); toast('Guest profile created'); }} onClose={() => setShowAdd(false)} />
         </Modal>
       )}
       {editing && (
         <Modal title="Edit Guest Profile" onClose={() => setEditing(null)} size="lg">
-          <GuestForm initial={editing} onSave={data => { onUpdate(editing.id, data); toast('Guest profile updated'); }} onClose={() => setEditing(null)} />
+          <GuestForm initial={editing} onSave={async data => { await onUpdate(editing.id, data); toast('Guest profile updated'); }} onClose={() => setEditing(null)} />
         </Modal>
       )}
       {viewing && (
@@ -199,7 +199,7 @@ export default function Guests({ guests, bookings, rooms, onAdd, onUpdate, onDel
       {deleting && (
         <ConfirmDialog
           message={`Delete ${deleting.firstName} ${deleting.lastName}'s profile? All booking history will be unlinked.`}
-          onConfirm={() => { onDelete(deleting.id); setDeleting(null); toast('Guest removed', 'info'); }}
+          onConfirm={async () => { await onDelete(deleting.id); setDeleting(null); toast('Guest removed', 'info'); }}
           onCancel={() => setDeleting(null)}
           confirmLabel="Delete Guest" />
       )}

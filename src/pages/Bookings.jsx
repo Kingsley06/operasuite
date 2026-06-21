@@ -3,6 +3,7 @@ import { Plus, CalendarDays, Search, Eye, XCircle, LogOut, ChevronDown, Check, M
 import { Card, StatusBadge, Btn, Modal, Input, Select, ConfirmDialog, EmptyState } from '../components/ui';
 import { formatDisplay, formatCurrency, calcNights, daysUntil, todayStr } from '../utils/dateUtils';
 import { useToast } from '../context/ToastContext';
+import { useHotel } from '../context/HotelContext';
 
 // --- WhatsApp & SMS helpers ---
 function sendWhatsApp(phone, message) {
@@ -17,26 +18,28 @@ function sendSMS(phone, message) {
   window.open(url, '_blank');
 }
 
-function buildMessages(guest, room, booking) {
+function buildMessages(guest, room, booking, hotelName) {
   const name = guest ? `${guest.firstName}` : 'Guest';
+  const hotel = hotelName || 'our hotel';
   const checkIn = formatDisplay(booking.checkIn);
   const checkOut = formatDisplay(booking.checkOut);
   const nights = calcNights(booking.checkIn, booking.checkOut);
   const total = formatCurrency(booking.totalAmount);
 
   return {
-    confirmation: `Hello ${name}! 🏨\n\nYour booking at PalmView Hotel has been confirmed.\n\n📋 Details:\nRoom: ${room?.number} (${room?.type})\nCheck-in: ${checkIn}\nCheck-out: ${checkOut}\nDuration: ${nights} night${nights > 1 ? 's' : ''}\nTotal: ${total}\n\nWe look forward to hosting you. Please let us know if you need anything.\n\nPalmView Hotel 🌴`,
+    confirmation: `Hello ${name}! 🏨\n\nYour booking at ${hotel} has been confirmed.\n\n📋 Details:\nRoom: ${room?.number} (${room?.type})\nCheck-in: ${checkIn}\nCheck-out: ${checkOut}\nDuration: ${nights} night${nights > 1 ? 's' : ''}\nTotal: ${total}\n\nWe look forward to hosting you. Please let us know if you need anything.\n\n${hotel}`,
 
-    reminder: `Hello ${name}! 👋\n\nThis is a friendly reminder that your check-out at PalmView Hotel is tomorrow (${checkOut}).\n\nRoom: ${room?.number}\nCheck-out time: 12:00 PM\n\nSafe travels! 🙏\nPalmView Hotel 🌴`,
+    reminder: `Hello ${name}! 👋\n\nThis is a friendly reminder that your check-out at ${hotel} is tomorrow (${checkOut}).\n\nRoom: ${room?.number}\nCheck-out time: 12:00 PM\n\nSafe travels! 🙏\n${hotel}`,
 
-    welcome: `Welcome to PalmView Hotel, ${name}! 🎉\n\nWe're delighted to have you.\n\nRoom: ${room?.number} (${room?.type})\nCheck-out: ${checkOut}\n\nFor any assistance, reply to this message or call the front desk.\n\nEnjoy your stay! 🌴`,
+    welcome: `Welcome to ${hotel}, ${name}! 🎉\n\nWe're delighted to have you.\n\nRoom: ${room?.number} (${room?.type})\nCheck-out: ${checkOut}\n\nFor any assistance, reply to this message or call the front desk.\n\nEnjoy your stay!`,
 
-    thankyou: `Dear ${name}, 🙏\n\nThank you for staying at PalmView Hotel!\n\nWe hope you had a wonderful experience. We'd love to welcome you back soon.\n\nYour feedback means a lot to us — feel free to reply with your thoughts.\n\nPalmView Hotel 🌴`,
+    thankyou: `Dear ${name}, 🙏\n\nThank you for staying at ${hotel}!\n\nWe hope you had a wonderful experience. We'd love to welcome you back soon.\n\nYour feedback means a lot to us — feel free to reply with your thoughts.\n\n${hotel}`,
   };
 }
 
 function MessagingPanel({ booking, guest, room, onClose }) {
-  const messages = buildMessages(guest, room, booking);
+  const { hotelName } = useHotel();
+  const messages = buildMessages(guest, room, booking, hotelName);
   const phone = guest?.phone || '';
   const [selected, setSelected] = useState('confirmation');
 
@@ -207,7 +210,10 @@ function BookingForm({ rooms, guests, onSave, onClose }) {
       </div>
       <div className="flex gap-3 pt-2">
         <Btn variant="secondary" className="flex-1" onClick={onClose}>Cancel</Btn>
-        <Btn className="flex-1" disabled={!valid} onClick={() => { onSave({ ...form, totalAmount: total }); onClose(); }}>
+        <Btn className="flex-1" disabled={!valid} onClick={async () => {
+          await onSave({ ...form, totalAmount: total });
+          onClose();
+        }}>
           Create Booking
         </Btn>
       </div>
@@ -404,7 +410,7 @@ export default function Bookings({ bookings, rooms, guests, onAdd, onCancel, onC
       {showAdd && (
         <Modal title="New Booking" onClose={() => setShowAdd(false)} size="lg">
           <BookingForm rooms={rooms} guests={guests}
-            onSave={data => { onAdd(data); toast('Booking created successfully!'); }}
+            onSave={async data => { await onAdd(data); toast('Booking created successfully!'); }}
             onClose={() => setShowAdd(false)} />
         </Modal>
       )}
@@ -423,14 +429,14 @@ export default function Bookings({ bookings, rooms, guests, onAdd, onCancel, onC
       {cancelling && (
         <ConfirmDialog
           message={`Cancel booking for ${getGuest(cancelling.guestId)?.firstName}? This will free up Room ${getRoom(cancelling.roomId)?.number}.`}
-          onConfirm={() => { onCancel(cancelling.id); setCancelling(null); toast('Booking cancelled', 'info'); }}
+          onConfirm={async () => { await onCancel(cancelling.id); setCancelling(null); toast('Booking cancelled', 'info'); }}
           onCancel={() => setCancelling(null)} confirmLabel="Cancel Booking" />
       )}
       {checkingOut && (
         <ConfirmDialog
           message={`Check out ${getGuest(checkingOut.guestId)?.firstName} from Room ${getRoom(checkingOut.roomId)?.number}?`}
           danger={false}
-          onConfirm={() => { onCheckOut(checkingOut.id); setCheckingOut(null); toast('Guest checked out. Room set to cleaning.'); }}
+          onConfirm={async () => { await onCheckOut(checkingOut.id); setCheckingOut(null); toast('Guest checked out. Room set to cleaning.'); }}
           onCancel={() => setCheckingOut(null)} confirmLabel="Confirm Checkout" />
       )}
     </div>

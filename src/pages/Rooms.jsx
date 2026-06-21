@@ -36,7 +36,7 @@ function RoomForm({ initial = {}, onSave, onClose }) {
       <Input label="Price per Night (₦)" type="number" value={form.pricePerNight} onChange={e => set('pricePerNight', +e.target.value)} />
       <div className="flex gap-3 pt-2">
         <Btn variant="secondary" className="flex-1" onClick={onClose}>Cancel</Btn>
-        <Btn className="flex-1" onClick={() => { if (form.number) { onSave(form); onClose(); } }}>
+        <Btn className="flex-1" onClick={async () => { if (form.number) { await onSave(form); onClose(); } }}>
           {initial.id ? 'Save Changes' : 'Add Room'}
         </Btn>
       </div>
@@ -126,7 +126,7 @@ export default function Rooms({ rooms, bookings, guests, onAdd, onUpdate, onDele
                 <div className="text-sm font-semibold text-emerald-700 mb-2">{formatCurrency(room.pricePerNight)}<span className="font-normal text-gray-400">/night</span></div>
                 {guestName && <div className="text-xs text-blue-600 bg-blue-50 rounded-lg px-2 py-1 mb-2">👤 {guestName}</div>}
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                  <select value={room.status} onChange={e => { onUpdate(room.id, { status: e.target.value }); toast(`Room ${room.number} marked as ${e.target.value}`); }}
+                  <select value={room.status} onChange={async e => { await onUpdate(room.id, { status: e.target.value }); toast(`Room ${room.number} marked as ${e.target.value}`); }}
                     className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none">
                     {STATUSES.map(s => <option key={s}>{s}</option>)}
                   </select>
@@ -176,18 +176,18 @@ export default function Rooms({ rooms, bookings, guests, onAdd, onUpdate, onDele
 
       {showAdd && (
         <Modal title="Add New Room" onClose={() => setShowAdd(false)}>
-          <RoomForm onSave={data => { onAdd(data); toast('Room added successfully'); }} onClose={() => setShowAdd(false)} />
+          <RoomForm onSave={async data => { await onAdd(data); toast('Room added successfully'); }} onClose={() => setShowAdd(false)} />
         </Modal>
       )}
       {editing && (
         <Modal title={`Edit Room ${editing.number}`} onClose={() => setEditing(null)}>
-          <RoomForm initial={editing} onSave={data => { onUpdate(editing.id, data); toast(`Room ${editing.number} updated`); }} onClose={() => setEditing(null)} />
+          <RoomForm initial={editing} onSave={async data => { await onUpdate(editing.id, data); toast(`Room ${editing.number} updated`); }} onClose={() => setEditing(null)} />
         </Modal>
       )}
       {deleting && (
         <ConfirmDialog
           message={`Delete Room ${deleting.number}? This cannot be undone.`}
-          onConfirm={() => { onDelete(deleting.id); setDeleting(null); toast('Room deleted', 'info'); }}
+          onConfirm={async () => { await onDelete(deleting.id); setDeleting(null); toast('Room deleted', 'info'); }}
           onCancel={() => setDeleting(null)}
           confirmLabel="Delete Room" />
       )}

@@ -10,7 +10,17 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+
+# Environment files — NEVER commit these (contain API keys)
 *.local
+.env
+.env.*
+
+# Zip exports — keep out of version control
+*.zip
+
+# Supabase CLI temp files (local link state, not source)
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*

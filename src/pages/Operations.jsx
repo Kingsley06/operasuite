@@ -47,7 +47,7 @@ function MaintenanceForm({ rooms, initial = {}, onSave, onClose }) {
       <div className="flex gap-3 pt-2">
         <Btn variant="secondary" className="flex-1" onClick={onClose}>Cancel</Btn>
         <Btn className="flex-1" disabled={!form.issue}
-          onClick={() => { onSave(form); onClose(); }}>
+          onClick={async () => { if (form.issue) { await onSave(form); onClose(); } }}>
           {initial.id ? 'Save Changes' : 'Log Issue'}
         </Btn>
       </div>
@@ -110,7 +110,7 @@ export default function Operations({ rooms, housekeeping, maintenance, onUpdateH
                   <div className="text-xs text-gray-500 mb-3">Last cleaned: {formatDisplay(hk.lastCleaned)}</div>
                   {hk.assignedTo && <div className="text-xs text-gray-600 mb-3">👤 {hk.assignedTo}</div>}
                   <select value={hk.status}
-                    onChange={e => { onUpdateHk(hk.roomId, { status: e.target.value, lastCleaned: e.target.value === 'Clean' ? todayStr() : hk.lastCleaned }); toast(`Room ${room.number} status updated`); }}
+                    onChange={async e => { await onUpdateHk(hk.roomId, { status: e.target.value, lastCleaned: e.target.value === 'Clean' ? todayStr() : hk.lastCleaned }); toast(`Room ${room.number} status updated`); }}
                     className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:border-emerald-400">
                     {HK_STATUSES.map(s => <option key={s}>{s}</option>)}
                   </select>
@@ -161,7 +161,7 @@ export default function Operations({ rooms, housekeeping, maintenance, onUpdateH
                       </div>
                       <div className="flex flex-col gap-1 shrink-0">
                         <select value={m.status}
-                          onChange={e => { onUpdateMx(m.id, { status: e.target.value }); toast('Issue status updated'); }}
+                          onChange={async e => { await onUpdateMx(m.id, { status: e.target.value }); toast('Issue status updated'); }}
                           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white outline-none">
                           {MX_STATUSES.map(s => <option key={s}>{s}</option>)}
                         </select>
@@ -181,18 +181,18 @@ export default function Operations({ rooms, housekeeping, maintenance, onUpdateH
 
       {showAddMx && (
         <Modal title="Log Maintenance Issue" onClose={() => setShowAddMx(false)}>
-          <MaintenanceForm rooms={rooms} onSave={data => { onAddMx(data); toast('Maintenance issue logged'); }} onClose={() => setShowAddMx(false)} />
+          <MaintenanceForm rooms={rooms} onSave={async data => { await onAddMx(data); toast('Maintenance issue logged'); }} onClose={() => setShowAddMx(false)} />
         </Modal>
       )}
       {editMx && (
         <Modal title="Edit Issue" onClose={() => setEditMx(null)}>
-          <MaintenanceForm rooms={rooms} initial={editMx} onSave={data => { onUpdateMx(editMx.id, data); toast('Issue updated'); }} onClose={() => setEditMx(null)} />
+          <MaintenanceForm rooms={rooms} initial={editMx} onSave={async data => { await onUpdateMx(editMx.id, data); toast('Issue updated'); }} onClose={() => setEditMx(null)} />
         </Modal>
       )}
       {deleteMx && (
         <ConfirmDialog
           message="Delete this maintenance issue?"
-          onConfirm={() => { onDeleteMx(deleteMx.id); setDeleteMx(null); toast('Issue removed', 'info'); }}
+          onConfirm={async () => { await onDeleteMx(deleteMx.id); setDeleteMx(null); toast('Issue removed', 'info'); }}
           onCancel={() => setDeleteMx(null)}
           confirmLabel="Delete" />
       )}
