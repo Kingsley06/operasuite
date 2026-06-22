@@ -56,21 +56,20 @@ export function HotelProvider({ userId, children }) {
 
   // Called from the first-time onboarding form
   const createHotel = async ({ name, email, phone, address }) => {
-    const { data: newHotel, error: hotelErr } = await supabase
+    const hotelId = crypto.randomUUID();
+
+    const { error: hotelErr } = await supabase
       .from('hotels')
-      .insert({ name, email, phone, address })
-      .select()
-      .single();
+      .insert({ id: hotelId, name, email, phone, address });
     if (hotelErr) throw hotelErr;
 
     const { error: profErr } = await supabase
       .from('profiles')
-      .update({ hotel_id: newHotel.id, role: 'owner' })
+      .update({ hotel_id: hotelId, role: 'owner' })
       .eq('id', userId);
     if (profErr) throw profErr;
 
     await load();
-    return newHotel;
   };
 
   const role = profile?.role || 'front_desk';
