@@ -28,13 +28,13 @@ export function HotelProvider({ userId, children }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (profErr) throw profErr;
-      const camelProfile = toCamel(prof);
+      const camelProfile = prof ? toCamel(prof) : null;
       setProfile(camelProfile);
 
-      if (camelProfile.hotelId) {
+      if (camelProfile?.hotelId) {
         const { data: hotelData, error: hotelErr } = await supabase
           .from('hotels')
           .select('*')
