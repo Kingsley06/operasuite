@@ -1,15 +1,16 @@
-import { LayoutDashboard, BedDouble, CalendarDays, Users, Settings, TrendingUp, Hotel, Menu, X, Zap, LogOut } from 'lucide-react';
+import { LayoutDashboard, BedDouble, CalendarDays, Users, Settings, TrendingUp, Hotel, Menu, X, Zap, LogOut, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useHotel } from '../context/HotelContext';
 
 const navItems = [
-  { id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
-  { id: 'rooms',        label: 'Rooms',          icon: BedDouble },
-  { id: 'bookings',     label: 'Bookings',       icon: CalendarDays },
-  { id: 'guests',       label: 'Guests',         icon: Users },
-  { id: 'operations',  label: 'Operations',     icon: Settings },
-  { id: 'revenue',      label: 'Revenue',        icon: TrendingUp },
-  { id: 'smartpricing', label: 'Smart Pricing',  icon: Zap, badge: 'AI' },
+  { id: 'dashboard',      label: 'Dashboard',      icon: LayoutDashboard },
+  { id: 'rooms',          label: 'Rooms',          icon: BedDouble },
+  { id: 'bookings',       label: 'Bookings',       icon: CalendarDays },
+  { id: 'guests',         label: 'Guests',         icon: Users },
+  { id: 'operations',     label: 'Operations',     icon: Settings },
+  { id: 'communications', label: 'Communications', icon: MessageCircle },
+  { id: 'revenue',        label: 'Revenue',        icon: TrendingUp },
+  { id: 'smartpricing',   label: 'Smart Pricing',  icon: Zap, badge: 'AI' },
 ];
 
 function initials(name = '') {
@@ -22,7 +23,7 @@ const roleBadgeColors = {
   front_desk:  'bg-emerald-400/20 text-emerald-300',
 };
 
-export default function Sidebar({ active, onNavigate, onLogout, user }) {
+export default function Sidebar({ active, onNavigate, onLogout, user, badges = {} }) {
   const [open, setOpen] = useState(false);
   const { hotelName, roleLabel, role, profile } = useHotel();
 
@@ -44,23 +45,26 @@ export default function Sidebar({ active, onNavigate, onLogout, user }) {
 
       {/* ── Nav items ── */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map(({ id, label, icon: Icon, badge }) => (
-          <button
-            key={id}
-            onClick={() => { onNavigate(id); setOpen(false); }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-              ${active === id
-                ? 'bg-emerald-500/20 text-white'
-                : 'text-emerald-200/70 hover:bg-white/5 hover:text-white'}`}
-          >
-            <Icon size={18} className={active === id ? 'text-emerald-300' : ''} />
-            <span className="flex-1 text-left">{label}</span>
-            {badge && (
-              <span className="text-xs px-1.5 py-0.5 rounded-md bg-purple-500/30 text-purple-300 font-medium">{badge}</span>
-            )}
-            {active === id && !badge && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-          </button>
-        ))}
+        {navItems.map(({ id, label, icon: Icon, badge: staticBadge }) => {
+          const badge = badges[id] ?? staticBadge;
+          return (
+            <button
+              key={id}
+              onClick={() => { onNavigate(id); setOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
+                ${active === id
+                  ? 'bg-emerald-500/20 text-white'
+                  : 'text-emerald-200/70 hover:bg-white/5 hover:text-white'}`}
+            >
+              <Icon size={18} className={active === id ? 'text-emerald-300' : ''} />
+              <span className="flex-1 text-left">{label}</span>
+              {badge && (
+                <span className="text-xs px-1.5 py-0.5 rounded-md bg-purple-500/30 text-purple-300 font-medium">{badge}</span>
+              )}
+              {active === id && !badge && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+            </button>
+          );
+        })}
       </nav>
 
       {/* ── Bottom: hotel name + user ── */}

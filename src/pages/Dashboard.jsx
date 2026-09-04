@@ -28,8 +28,8 @@ function RoomPopup({ room, booking, guest, position, onClose }) {
       <div className="fixed inset-0 z-[9998]" onClick={onClose} />
 
       <div
-        className="fixed z-[9999] w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
-        style={{ top, left, animation: 'popIn 0.15s ease-out' }}
+        className="fixed z-[9999] w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-pop-in origin-top-left"
+        style={{ top, left }}
         onClick={e => e.stopPropagation()}
       >
         {/* colour bar */}
@@ -54,7 +54,7 @@ function RoomPopup({ room, booking, guest, position, onClose }) {
         {/* price */}
         <div className="px-4 pb-3 border-b border-gray-100 flex items-center gap-1.5">
           <DollarSign size={13} className="text-emerald-600" />
-          <span className="text-sm font-bold text-emerald-700">{formatCurrency(room.pricePerNight)}</span>
+          <span className="text-sm font-bold text-emerald-700 tabular-nums">{formatCurrency(room.pricePerNight)}</span>
           <span className="text-xs text-gray-400">/ night</span>
         </div>
 
@@ -82,7 +82,7 @@ function RoomPopup({ room, booking, guest, position, onClose }) {
               </div>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">{nights} night{nights !== 1 ? 's' : ''} · {formatCurrency(booking.totalAmount)}</span>
+              <span className="text-gray-500 tabular-nums">{nights} night{nights !== 1 ? 's' : ''} · {formatCurrency(booking.totalAmount)}</span>
               {daysLeft !== null && (
                 <span className={`font-semibold ${daysLeft === 0 ? 'text-red-500' : daysLeft <= 2 ? 'text-amber-500' : 'text-gray-500'}`}>
                   {daysLeft < 0 ? 'Overdue' : daysLeft === 0 ? 'Leaving today' : `${daysLeft}d left`}
@@ -122,13 +122,6 @@ function RoomPopup({ room, booking, guest, position, onClose }) {
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes popIn {
-          from { opacity: 0; transform: scale(0.9) translateY(-6px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-      `}</style>
     </>
   );
 }
@@ -143,18 +136,30 @@ function RoomCell({ room, activeBookings, guests, colorClass }) {
     setPopup(prev => prev ? null : { x: e.clientX, y: e.clientY });
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPopup(prev => prev ? null : { x: rect.left, y: rect.bottom });
+  };
+
   return (
     <>
       <div
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        role="button"
+        aria-label={`Room ${room.number}, ${room.status}`}
         className={`
           aspect-square rounded-lg flex items-center justify-center
-          text-xs font-bold cursor-pointer select-none
-          transition-all duration-150
-          hover:scale-110 hover:shadow-lg hover:brightness-110
+          text-xs font-bold cursor-pointer select-none tabular-nums
+          transition-transform duration-100 ease-out-expo
+          hover:scale-[1.06]
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1
           ${colorClass}
-          ${popup ? 'ring-2 ring-white ring-offset-1 scale-110 shadow-lg' : ''}
+          ${popup ? 'ring-2 ring-white ring-offset-1 scale-[1.06]' : ''}
         `}
+        tabIndex={0}
       >
         {room.number}
       </div>
@@ -206,10 +211,16 @@ export default function Dashboard({ rooms, bookings, guests }) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={BedDouble}    label="Total Rooms"          value={totalRooms}       color="blue"   />
-        <StatCard icon={CheckCircle}  label="Available"            value={available}        color="emerald"/>
-        <StatCard icon={BedDouble}    label="Booked"               value={booked}           color="red"    />
-        <StatCard icon={LogOut}       label="Checking Out Today"   value={checkingOutToday} color="amber"  />
+        {[
+          { icon: BedDouble,   label: 'Total Rooms',        value: totalRooms,       color: 'blue'    },
+          { icon: CheckCircle, label: 'Available',          value: available,        color: 'emerald' },
+          { icon: BedDouble,   label: 'Booked',              value: booked,           color: 'red'     },
+          { icon: LogOut,      label: 'Checking Out Today',  value: checkingOutToday, color: 'amber'   },
+        ].map((s, i) => (
+          <div key={s.label} className="animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
+            <StatCard icon={s.icon} label={s.label} value={s.value} color={s.color} />
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -319,7 +330,7 @@ export default function Dashboard({ rooms, bookings, guests }) {
                     <td className="px-5 py-3 text-gray-600">{r ? `${r.number} (${r.type})` : '-'}</td>
                     <td className="px-5 py-3 text-gray-600">{formatDisplay(b.checkIn)}</td>
                     <td className="px-5 py-3 text-gray-600">{formatDisplay(b.checkOut)}</td>
-                    <td className="px-5 py-3 font-medium text-gray-800">{formatCurrency(b.totalAmount)}</td>
+                    <td className="px-5 py-3 font-medium text-gray-800 tabular-nums">{formatCurrency(b.totalAmount)}</td>
                     <td className="px-5 py-3"><StatusBadge status={b.status} /></td>
                   </tr>
                 );

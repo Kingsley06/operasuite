@@ -38,3 +38,16 @@ enable_signup = true
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+# Webhook receivers are called by Meta, not by a logged-in Supabase user —
+# they can't send a Supabase JWT, so JWT verification is disabled and each
+# function authenticates the request itself (verify-token handshake on GET,
+# X-Hub-Signature-256 HMAC check on POST).
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.instagram-webhook]
+verify_jwt = false
+
+[functions.messenger-webhook]
+verify_jwt = false

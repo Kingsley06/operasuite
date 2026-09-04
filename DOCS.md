@@ -1,6 +1,6 @@
 # Opera Suite — Project Documentation
 
-> Last updated: 2026-06-26
+> Last updated: 2026-09-04
 > This file is maintained by Claude and updated whenever a feature is added or changed.
 
 ---
@@ -63,6 +63,10 @@ Both use `SECURITY DEFINER SET search_path = public` (required by Supabase).
 | `bookings` | Reservations linking guest ↔ room |
 | `housekeeping` | One record per room, tracks cleaning status |
 | `maintenance` | Maintenance issues per room |
+| `channels` | Connected WhatsApp / Instagram / Messenger accounts, per hotel |
+| `channel_secrets` | Access tokens for each channel — no RLS policies at all, only reachable via the service-role key inside Edge Functions |
+| `conversations` | One row per (channel, external contact) — status, AI-handled flag, unread count |
+| `messages` | Every inbound/outbound message in a conversation |
 
 ### Key constraints
 
@@ -87,6 +91,10 @@ Both use `SECURITY DEFINER SET search_path = public` (required by Supabase).
 - **bookings** — all staff can view/insert/update; management/owner can delete
 - **housekeeping** — all staff can view/insert/update
 - **maintenance** — all staff can view/insert/update; management/owner can delete
+- **channels** — all staff can view; management/owner can insert/update (the AI-autonomy toggle); only owner can delete
+- **channel_secrets** — no policies at all; unreachable except via the service-role key
+- **conversations** — all staff can view/update (resolve, hand back to AI, mark read)
+- **messages** — all staff can view; staff can insert their own manual replies (`sender = 'staff'`) — inbound/AI messages are written by Edge Functions via the service-role key
 
 ---
 
@@ -127,17 +135,26 @@ hotel-app/
 │   │   ├── Rooms.jsx             # Room management
 │   │   ├── Guests.jsx            # Guest management
 │   │   ├── Bookings.jsx          # Booking management + WhatsApp/SMS message builder
-│   │   └── Operations.jsx        # Housekeeping + Maintenance
+│   │   ├── Operations.jsx        # Housekeeping + Maintenance
+│   │   └── Communications.jsx    # Multi-channel inbox + AI receptionist controls
 │   └── lib/
 │       └── supabase.js           # Supabase client initialisation
 ├── supabase/
 │   ├── schema.sql                # Full schema reference (human-readable)
 │   ├── config.toml               # Supabase CLI project config
-│   └── migrations/
-│       ├── 20260621000000_initial_schema.sql         # Full schema — tables, RLS, triggers
-│       ├── 20260621000001_fix_security_definer.sql   # Adds SET search_path to all functions
-│       ├── 20260622000000_hotels_insert_policy.sql   # First INSERT policy attempt
-│       └── 20260622000001_fix_hotels_insert_policy.sql  # Final simplified INSERT policy
+│   ├── migrations/
+│   │   ├── 20260621000000_initial_schema.sql         # Full schema — tables, RLS, triggers
+│   │   ├── 20260621000001_fix_security_definer.sql   # Adds SET search_path to all functions
+│   │   ├── 20260622000000_hotels_insert_policy.sql   # First INSERT policy attempt
+│   │   ├── 20260622000001_fix_hotels_insert_policy.sql  # Final simplified INSERT policy
+│   │   └── 20260904000000_communications.sql         # channels/channel_secrets/conversations/messages + RLS
+│   └── functions/                                    # Supabase Edge Functions (Deno) — see "Communications Hub" below
+│       ├── _shared/                                  # admin client, CORS, HMAC verification, AI agent, outbound sender
+│       ├── whatsapp-webhook/                         # WhatsApp Cloud API webhook receiver
+│       ├── instagram-webhook/                        # Instagram DM webhook receiver
+│       ├── messenger-webhook/                        # Messenger webhook receiver
+│       ├── send-manual-message/                      # Staff reply → hands conversation off the AI
+│       └── save-channel-credential/                  # Owner-only: connects a channel (writes to channel_secrets)
 └── .env.local                    # Supabase URL + anon key (gitignored — never committed)
 ```
 
@@ -237,6 +254,68 @@ WHERE id = '<staff_auth_uuid>';
 
 ---
 
+## Communications Hub — Multi-Channel AI Receptionist
+
+Guests can message the hotel on WhatsApp, Instagram, or Messenger; an AI agent (Claude, via the Anthropic API) reads the conversation, answers questions, and can book a room — fully autonomously by default. Staff see every conversation, across every channel, live in the **Communications** tab.
+
+### Architecture
+
+```
+Guest sends a message on WhatsApp/Instagram/Messenger
+        │
+        ▼
+Meta Graph API → POST to the matching Supabase Edge Function webhook
+  (whatsapp-webhook / instagram-webhook / messenger-webhook)
+        │  1. Verify X-Hub-Signature-256 (HMAC, keyed with the channel's app_secret)
+        │  2. Upsert `conversations`, insert inbound `messages` row
+        ▼
+_shared/aiAgent.ts
+        │  3. If the channel's `ai_autonomous` flag is off, or the conversation has
+        │     been taken over by staff (`ai_handled = false`) → mark `needs_attention`, stop.
+        │  4. Otherwise call the Anthropic Messages API (model: claude-sonnet-5) with
+        │     tools: check_availability, create_booking, escalate_to_staff
+        │  5. Insert the AI's reply as an outbound `messages` row, deliver it via
+        │     the platform's Send API (_shared/sendOutbound.ts)
+        ▼
+Communications.jsx (Supabase Realtime subscription) — staff see it appear instantly
+```
+
+### The AI's booking tool
+
+`create_booking` in `_shared/aiAgent.ts` deliberately mirrors `useStore.js`'s `addBooking` exactly — same `status` computation (`checkIn <= today ? 'Active' : 'Upcoming'`), same follow-up `rooms.status = 'Booked'` update — but runs server-side with the service-role key, and **recomputes the total from the room's `price_per_night` × nights itself** rather than trusting whatever number the model produces. If the DB's `no_double_booking` exclusion constraint rejects the insert (room got taken between check and book), the tool returns an error the model can react to instead of crashing.
+
+### The safety kill switch
+
+Each row in `channels` has an `ai_autonomous` boolean (default `true`). Turning it off for a channel (Communications → Channels → toggle) makes every new inbound message on that channel go straight to `needs_attention` for a human, with no AI auto-reply and no auto-booking. Per-conversation, staff can also "take over" at any time by sending a manual reply (which sets `ai_handled = false`) and hand it back to the AI with one click.
+
+### Connecting a channel (external setup required)
+
+The code can't do this part — it needs a real Meta Developer App:
+
+1. Create a Meta Developer App → add the WhatsApp Business, Instagram, and/or Messenger products.
+2. Get a permanent access token + the app secret for each; Instagram/Messenger also need a connected Facebook Page.
+3. In the app: **Communications → Channels (owner only) → Connect a new channel**, fill in the account/phone-number ID, access token, app secret, and a verify token of your choosing. This calls `save-channel-credential`, which writes straight to `channel_secrets` — the token is never in `.env.local` or the client bundle.
+4. In the Meta App's webhook config, register the matching URL with the *same* verify token you just chose:
+   - `https://mweezcsapsjperhaefqx.supabase.co/functions/v1/whatsapp-webhook`
+   - `https://mweezcsapsjperhaefqx.supabase.co/functions/v1/instagram-webhook`
+   - `https://mweezcsapsjperhaefqx.supabase.co/functions/v1/messenger-webhook`
+5. Set the AI's API key as an Edge Function secret (one-time, via Supabase CLI):
+   ```bash
+   supabase secrets set ANTHROPIC_API_KEY=<key>
+   ```
+
+### Deploying the Edge Functions
+
+```bash
+supabase functions deploy whatsapp-webhook --no-verify-jwt
+supabase functions deploy instagram-webhook --no-verify-jwt
+supabase functions deploy messenger-webhook --no-verify-jwt
+supabase functions deploy send-manual-message
+supabase functions deploy save-channel-credential
+```
+
+---
+
 ## Local Development
 
 ```bash
@@ -276,6 +355,7 @@ VITE_SUPABASE_ANON_KEY=<anon key>
 - [x] Operations page — housekeeping status + maintenance issues
 - [x] Dashboard — overview stats
 - [x] GitHub repo + Vercel deployment
+- [x] Communications hub — WhatsApp/Instagram/Messenger inbox, AI receptionist (auto-reply + auto-booking), per-channel autonomy kill switch, staff take-over
 
 ## What's Not Built Yet
 

@@ -5,6 +5,7 @@ import Rooms from './pages/Rooms';
 import Bookings from './pages/Bookings';
 import Guests from './pages/Guests';
 import Operations from './pages/Operations';
+import Communications from './pages/Communications';
 import Revenue from './pages/Revenue';
 import SmartPricing from './pages/SmartPricing';
 import Login from './pages/Login';
@@ -102,6 +103,28 @@ function AppShell({ session }) {
   const { hotelId, loading: hotelLoading, refresh } = useHotel();
 
   const store = useStore(hotelId);
+  const [commsUnread, setCommsUnread] = useState(0);
+
+  const loadCommsUnread = useCallback(async () => {
+    if (!hotelId) return;
+    const { count } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .eq('hotel_id', hotelId)
+      .gt('unread_count', 0);
+    setCommsUnread(count ?? 0);
+  }, [hotelId]);
+
+  useEffect(() => { loadCommsUnread(); }, [loadCommsUnread]);
+
+  useEffect(() => {
+    if (!hotelId) return;
+    const ch = supabase
+      .channel(`hotel:${hotelId}:comms-badge`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `hotel_id=eq.${hotelId}` }, loadCommsUnread)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [hotelId, loadCommsUnread]);
 
   // Wrap every store mutation so pages don't need try/catch
   const wrap = useCallback((fn, successMsg) => async (...args) => {
@@ -188,6 +211,9 @@ function AppShell({ session }) {
           />
         );
 
+      case 'communications':
+        return <Communications />;
+
       case 'revenue':
         return <Revenue {...pageProps} />;
 
@@ -212,6 +238,7 @@ function AppShell({ session }) {
         onNavigate={setPage}
         onLogout={handleLogout}
         user={session.user}
+        badges={commsUnread > 0 ? { communications: String(commsUnread) } : {}}
       />
       <main className="flex-1 overflow-auto">
         {store.loading ? (

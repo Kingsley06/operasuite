@@ -140,7 +140,7 @@ export function Btn({ children, variant = 'primary', size = 'md', className = ''
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2.5 text-sm', lg: 'px-6 py-3 text-base' };
   return (
     <button {...props}
-      className={`inline-flex items-center gap-2 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}>
+      className={`inline-flex items-center gap-2 font-medium rounded-xl transition-[background-color,box-shadow,transform] duration-150 ease-out-expo active:scale-[0.97] disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}>
       {children}
     </button>
   );
@@ -165,7 +165,7 @@ export function StatCard({ icon: Icon, label, value, sub, color = 'emerald' }) {
           <Icon size={20} />
         </div>
       </div>
-      <div className="text-2xl font-bold text-gray-900 mb-0.5">{value}</div>
+      <div className="text-2xl font-bold text-gray-900 mb-0.5 tabular-nums">{value}</div>
       <div className="text-sm text-gray-500">{label}</div>
       {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
     </Card>
